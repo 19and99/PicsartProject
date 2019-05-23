@@ -246,9 +246,12 @@ Mat searchSource(Mat& image,Mat mask,Mat wrinkles,Point LT,int length,double rat
 	int searchDistance = max(max(LT.y,LT.x),max(height - (LT.y + length) + 1, width - (LT.x + length) + 1));
 	bool found = false;
 
+	int d;
 	Point ltCenter(LT.x - (sourceLength - length) / 2, LT.y + (length - sourceLength)/2);
-	for (int d = 0; d <= searchDistance; ++d) {
-		for (int shift = 0; shift <= d; ++shift) {
+	for ( d = 0; d <= searchDistance; ++d)
+	{
+
+		for (int shift = 0; shift <= d + (length/2) + (sourceLength/2) + 1; ++shift) {
 			sourceLT.x = LT.x - (sourceLength - length) / 2 + shift;
 			sourceLT.y = LT.y - sourceLength - d;
 			if (sourceLT.x >= 0 && sourceLT.y >= 0 && sourceLT.x + sourceLength < width && sourceLT.y + sourceLength < height) {
@@ -286,6 +289,8 @@ Mat searchSource(Mat& image,Mat mask,Mat wrinkles,Point LT,int length,double rat
 		}
 		if (found) break;
 	}
+
+
 	if (!found) { std::cout << "Couldn't find source from image" << endl; return ret; }
 	Rect r(sourceLT.x, sourceLT.y, sourceLength, sourceLength);
 	image(r).copyTo(ret);
@@ -466,104 +471,16 @@ void filter(Mat& image, Mat mask, Mat& wrinkles, int smallPatchLength, double so
 
 
 
-
-void test(int smallPatchLength, double overlapRatio, double tollerance) {
-	Mat image = imread("filling.jpg");
-	Mat wrinkles = imread("wrinkles.jpg");
-
-
-	Mat source = imread("texture.jpg");
-
-	Point lt(0, 0);
-	Point rb(image.cols - 1, image.rows - 1);
-
-	int regWidth = rb.x - lt.x + 1;
-	int regHeight = rb.y - lt.y + 1;
-	int patchInRows = regWidth / smallPatchLength;
-	int patchInCols = regHeight / smallPatchLength;
-
-	bool** patchStatus = new bool*[patchInCols];
-	for (int i = 0; i < patchInCols; ++i) {
-
-	}
-
-	for (int i = 0; i < patchInCols; ++i) {
-		for (int j = 0; j < patchInRows; ++j) {
-			Point smallPatchLT(lt.x + j * smallPatchLength, lt.y + i * smallPatchLength);
-		
-			bool hasTop = i > 0 ? true : false;
-			bool hasLeft = j > 0 ? true : false;
-
-			int lengthDiff = overlapRatio * smallPatchLength;
-			int bigPatchHeight = smallPatchLength + hasTop * lengthDiff;
-			int bigPatchWidth = smallPatchLength + hasLeft * lengthDiff;
-
-			Point bigPatchLT(smallPatchLT.x - hasLeft * lengthDiff, smallPatchLT.y - hasTop * lengthDiff);
-			Rect rectLeft(bigPatchLT.x, bigPatchLT.y, lengthDiff, bigPatchHeight);
-			Rect rectTop(bigPatchLT.x, bigPatchLT.y, bigPatchWidth, lengthDiff);
-			
-
-			int** coeff = new int*[bigPatchHeight];
-			for (int i = 0; i < bigPatchHeight; ++i) {
-				coeff[i] = new int[bigPatchWidth];
-				for (int j = 0; j < bigPatchWidth; ++j) {
-					if ((hasTop && i < lengthDiff )|| (hasLeft && j < lengthDiff ))
-						coeff[i][j] = 1;
-					else
-						coeff[i][j] = 0;
-				}
-			}
-			Mat patch;
-			if (hasTop || hasLeft) {
-				patch = searchPatch(image, source, bigPatchLT, bigPatchWidth, bigPatchHeight, tollerance, coeff);
-				if (hasTop) {
-					Mat overlayTop = image(rectTop);
-					Rect patchR(rectTop.x - bigPatchLT.x, rectTop.y - bigPatchLT.y, rectTop.width, rectTop.height);
-					Mat patchTop = patch(patchR);
-					hQuilt(overlayTop, patchTop);
-				}
-				if (hasLeft) {
-					Mat overlayLeft = image(rectLeft);
-					Rect patchB(rectLeft.x - bigPatchLT.x, rectLeft.y - bigPatchLT.y, rectLeft.width, rectLeft.height);
-					Mat patchLeft = patch(patchB);
-					vQuilt(overlayLeft, patchLeft);
-				}
-
-
-			}
-			else {
-				Rect patchRect(0, 0, bigPatchWidth, bigPatchHeight);
-				patch = source(patchRect);
-			}
-
-			patchReplace(image, patch, bigPatchLT, bigPatchHeight, bigPatchWidth);
-			Rect smallPatchRect(smallPatchLT.x, smallPatchLT.y, smallPatchLength, smallPatchLength);
-			//rectangle(image, smallPatchRect, Scalar(0, 0, 255));
-			
-		int percent = ((i * patchInRows + j) * 100.0) / (patchInCols * patchInRows);
-		std::cout <<"row:"<< i + 1 << "patch" << j + 1<< endl;
-		}
-	}
-
-	imshow("asd", image);
-}
-
 int main() {
 	Mat image = imread("forehead.jpg");
 	Mat wrinkles = imread("mask.jpg");
 	Mat hairMask = imread("hairMask.jpg");
 
-	clock_t begin = clock();
 	if (image.rows != wrinkles.rows || image.cols != wrinkles.cols) {
 		std::cout << "image and mask should be of the same size" << endl; 
 	}
 	else filter(image,hairMask, wrinkles,15,1.7,0.33,0.6);
 
-	//test(20,0.2,0.2);
-	clock_t end = clock();
-	std::cout << "Wrinkles Time:  " << WrinklesTime << endl;
-	std::cout << "Overall Time:  " << (double)(end - begin) << endl;
-	
 
 	imshow("quilted overlay",image);
 	imwrite("removed.jpg", image);
