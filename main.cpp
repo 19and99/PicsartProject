@@ -6,6 +6,7 @@
 
 using namespace std;
 using namespace cv;
+
 double WrinklesTime = 0;
 
 int mod(int a) { return a > 0 ? a : -a; }
@@ -30,6 +31,26 @@ int min(int a, int b, int c) {
 	return min(a, min(b, c));
 }
 int max(int a, int b) { return a > b ? a : b; }
+
+vector<Point> searchPath(int sideLength, int width, int sideCount, int** distMatrix) {
+	int** pathMatrix;
+	vector<Point> path;
+	int length ;
+	if (sideCount == 4) {
+		length = sideCount * (sideLength - 1) - 1;
+
+		pathMatrix = new int*[length];
+		for (int i = 0; i < length; ++i) {
+			pathMatrix[i] = new int[width];
+		}
+
+		for (int i = 0; i < width; ++i) {
+			pathMatrix[i][i] = distMatrix[i][i];
+		}
+
+	}
+	return path;
+}
 
 
 void vQuilt(Mat& left, Mat& right) {
@@ -200,6 +221,67 @@ void hQuilt(Mat& top, Mat& bottom) {
 		}
 	}
 }
+void Quilt(Mat& oldPatch,Mat& newPatch,int overlapSize,bool left,bool top,bool right,bool bottom) {
+	if (oldPatch.rows != newPatch.rows || oldPatch.cols != newPatch.cols) {
+		cout << "the old and new patches should be of the same size" << endl;
+		return;
+	}
+	int height = oldPatch.rows;
+	int width = oldPatch.cols;
+	int sideCount = left + right + top + bottom;
+	int** distMatrix = new int*[height];
+	for (int i = 0; i < height; ++i) {
+		distMatrix[i] = new int[width];
+	}
+	
+	int** pathMatrix = new int*[height];
+	for (int i = 0; i < height; ++i) {
+		pathMatrix[i] = new int[width];
+	}
+
+	vector<Point> path;
+
+
+	if (sideCount == 4) {
+		for (int i = 0; i < height; ++i) {
+			for (int j = 0; j < width; ++j) {
+				if (i < overlapSize || j < overlapSize || i >= height - overlapSize || j >= width - overlapSize) {
+					distMatrix[i][j] = squareDiff(oldPatch.at<Vec3b>(i, j), newPatch.at<Vec3b>(i, j));
+				}
+			}
+		}
+
+		for (int i = 0; i < overlapSize; ++i) {
+			pathMatrix[height - 1 - i][i] = distMatrix[height - 1 - i][i];
+		}
+
+		pathMatrix[height - 2][0] = distMatrix[height - 2][0] + pathMatrix[height - 1][0];
+
+		for (int i = height - 3; i > height - overlapSize - 2; --i) {
+			
+			pathMatrix[i][height - 2 - i] = distMatrix[i][height - 2 - i] + min(pathMatrix[i + 1][height - 2 - i], pathMatrix[i + 1][height - 3 - i]);
+
+		}
+
+		for (int i = height - 3; i >= 0; --i) {
+			pathMatrix[i][0] = distMatrix[i][0] + min(pathMatrix[i + 1][0], pathMatrix[i + 1][1]);
+			for (int j = 0; j < min(overlapSize, height - i - 2); ++j) {
+				pathMatrix[i][j] = distMatrix[i][j] + min(pathMatrix[i + 1][j], pathMatrix[i + 1][j - 1], pathMatrix[i + 1][j + 1]);
+			}
+			if (i < height - overlapSize - 1) {
+				pathMatrix[i][width - 1] = distMatrix[i][width - 1] + min(pathMatrix[i + 1][width - 1], pathMatrix[i + 1][width - 2]);
+			}
+		}
+
+
+
+
+	}
+
+	else if (sideCount == 3) {}
+
+	else if (sideCount == 1) {}
+}
 
 void patchReplace(Mat& image, Mat& patch, Point LT, int height,int width) {
 	for (int i = LT.y; i < LT.y + height; ++i) {
@@ -352,7 +434,7 @@ void filter(Mat& image, Mat mask, Mat& wrinkles, int smallPatchLength, double so
 		for (int j = 0; j < width; ++j) {
 			if (wrinkles.at<Vec3b>(i, j) == Vec3b(255,255,255))
 			{
-				image.at<Vec3b>(i, j) = Vec3b(0, 0, 0);
+				//image.at<Vec3b>(i, j) = Vec3b(0, 0, 0);
 			}
 		}
 	}
@@ -449,8 +531,13 @@ void filter(Mat& image, Mat mask, Mat& wrinkles, int smallPatchLength, double so
 				clock_t qEnd = clock();
 				QuiltTime += (double)(qEnd - qBegin);
 
+				//Mat whiteMask = 255 * Mat::ones(patch.rows, patch.cols, patch.depth());
+				//Point center(bigPatchLT.x + (double)(bigPatchWidth - 1) / 2, bigPatchLT.y + (double)(bigPatchWidth - 1) / 2);
+				//seamlessClone(patch, image, whiteMask, center, image, NORMAL_CLONE);
+				
 				patchReplace(image, patch, bigPatchLT, bigPatchHeight,bigPatchWidth);
 				
+
 				for (int i = smallPatchLT.y; i < smallPatchLT.y + smallPatchLength; ++i) {
 					for (int j = smallPatchLT.x; j < smallPatchLT.x + smallPatchLength; ++j) {
 						wrinkles.at<Vec3b>(i, j) = Vec3b(0, 0, 0);
@@ -469,21 +556,25 @@ void filter(Mat& image, Mat mask, Mat& wrinkles, int smallPatchLength, double so
 	std::cout << "Source Searching time:  " << SourceSearchTime << std::endl;
 }
 
-
-
 int main() {
-	Mat image = imread("forehead.jpg");
-	Mat wrinkles = imread("mask.jpg");
-	Mat hairMask = imread("hairMask.jpg");
+	Mat image = imread("forehead2.jpg");
+	Mat wrinkles = imread("mask2.jpg");
+	Mat hairMask = imread("hairMask2.jpg");
 
+	clock_t begin = clock();
 	if (image.rows != wrinkles.rows || image.cols != wrinkles.cols) {
 		std::cout << "image and mask should be of the same size" << endl; 
 	}
-	else filter(image,hairMask, wrinkles,15,1.7,0.33,0.6);
+	else filter(image,hairMask, wrinkles,20,1.7,0.2,0.1);
+
+	clock_t end = clock();
+
+	cout << (double)(end - begin) << endl;
+
 
 
 	imshow("quilted overlay",image);
-	imwrite("removed.jpg", image);
+	//imwrite("removed.jpg", image);
 	waitKey(0);
 	return 0;
 }
