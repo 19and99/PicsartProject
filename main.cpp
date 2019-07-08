@@ -3,12 +3,12 @@
 #include <ctime>
 #include <stdlib.h> 
 #include <time.h>  
+#include "Filter.h"
 
 using namespace std;
 using namespace cv;
 
-double WrinklesTime = 0;
-
+/*
 int mod(int a) { return a > 0 ? a : -a; }
 
 int squareDiff(Vec3b p1, Vec3b p2) {
@@ -555,26 +555,24 @@ void filter(Mat& image, Mat mask, Mat& wrinkles, int smallPatchLength, double so
 	std::cout << "Patch Searching time:  " << PatchSearchTime << std::endl;
 	std::cout << "Source Searching time:  " << SourceSearchTime << std::endl;
 }
-
+*/
 int main() {
-	Mat image = imread("forehead2.jpg");
-	Mat wrinkles = imread("mask2.jpg");
-	Mat hairMask = imread("hairMask2.jpg");
+	Mat image = imread("test.jpg");
+	Mat wrinkles = imread("testmask.jpg");
+	int patchLength = 20;
+	int overlapLength = 4;
+	double sourceRatio = 1;
 
-	clock_t begin = clock();
-	if (image.rows != wrinkles.rows || image.cols != wrinkles.cols) {
-		std::cout << "image and mask should be of the same size" << endl; 
+	Filter i(image, wrinkles);
+	Rect r(40, 40, 20, 20);
+	vector<vector<int>> coeff(r.height);
+	for (int i = 0; i < r.height; ++i) {
+		for (int j = 0; j < r.width; ++j) {
+			if (j < 3 || i < 3) coeff[i].push_back(1);
+			else coeff[i].push_back(0);
+		}
 	}
-	else filter(image,hairMask, wrinkles,20,1.7,0.2,0.1);
-
-	clock_t end = clock();
-
-	cout << (double)(end - begin) << endl;
-
-
-
-	imshow("quilted overlay",image);
-	//imwrite("removed.jpg", image);
+	imshow("inpainted",image);
 	waitKey(0);
 	return 0;
 }
